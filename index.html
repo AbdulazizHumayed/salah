@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Salah & Qibla</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Salah">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EDF0EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1518" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&family=Reem+Kufi:wght@500;600&display=swap">
+<style>
+/* Layout: one phone-width column; two views (Times, Qibla) switched by a bottom bar. */
+:root{
+  --bg:#EDF0EE; --surface:#FFFFFF; --ink:#15232A; --muted:#5E6E72; --line:#D5DCDA;
+  --accent:#9A5A2C; --accent-soft:#F2E4D8; --ok:#2F7D5B;
+  --font-body:"Readex Pro",-apple-system,"SF Arabic","Geeza Pro",system-ui,sans-serif;
+  --font-display:"Reem Kufi","Readex Pro",-apple-system,"Geeza Pro",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0E1518; --surface:#162126; --ink:#E6ECEA; --muted:#8C9DA1; --line:#24333A;
+  --accent:#E0A56F; --accent-soft:#33261C; --ok:#5CC39A; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--font-body);
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+.app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 84px) max(16px,env(safe-area-inset-left,0px))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.place{min-width:0}
+.place b{display:block;font-weight:500;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.place span{color:var(--muted);font-size:13px}
+button{font:inherit;color:inherit;cursor:pointer}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:14px;font-weight:500;flex-shrink:0}
+.chip:focus-visible,.tab:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Next prayer */
+.next{margin-top:28px}
+.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+[dir=rtl] .label{letter-spacing:0;font-size:13px}
+.next h1{font:600 52px/1.05 var(--font-display);margin:6px 0 4px;letter-spacing:-.01em}
+.next .when{font-size:18px;color:var(--muted);font-variant-numeric:tabular-nums}
+.next .when strong{color:var(--accent);font-weight:500}
+
+/* Sky band: 24 hours, colored by the sun, with each prayer marked */
+.sky{position:relative;margin:26px 0 8px;height:44px}
+.band{position:absolute;inset:14px 0 14px;border-radius:8px;
+  background:linear-gradient(90deg,var(--g))}
+.mark{position:absolute;top:8px;bottom:8px;width:2px;margin-left:-1px;background:var(--ink);opacity:.55;border-radius:2px}
+.mark.sun{opacity:.25}
+.now{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--accent);border-radius:3px}
+.now::after{content:"";position:absolute;top:-3px;left:-3.5px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.hours{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* List */
+.list{margin:22px 0 0;padding:0;list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.list li{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-top:1px solid var(--line)}
+.list li:first-child{border-top:0}
+.list .n{font-weight:500}
+.list .t{font-variant-numeric:tabular-nums;font-size:17px}
+.list li.sun .n,.list li.sun .t{color:var(--muted);font-weight:400}
+.list li.is-next{background:var(--accent-soft)}
+.list li.is-next .n,.list li.is-next .t{color:var(--accent);font-weight:600}
+.list li.past .n,.list li.past .t{opacity:.5}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--muted)}
+
+/* Qibla */
+.qibla{display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:20px;gap:14px}
+.dialwrap{width:min(84vw,320px);aspect-ratio:1;max-width:100%;position:relative}
+.dialwrap svg{width:100%;height:100%;display:block;overflow:visible}
+#rose{transition:transform .15s linear;transform-origin:160px 160px}
+.ring{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.tick{stroke:var(--muted);stroke-width:1.5}
+.tick.major{stroke:var(--ink);stroke-width:2}
+.card{font:500 15px var(--font-body);fill:var(--muted);text-anchor:middle;dominant-baseline:central}
+.card.n{fill:var(--accent);font-weight:600}
+.qline{stroke:var(--accent);stroke-width:3;stroke-linecap:round}
+.kaaba{fill:var(--ink)}
+.kaaba-band{fill:var(--accent)}
+.pointer{fill:var(--ink)}
+.aligned .pointer{fill:var(--ok)}
+.aligned .ring{stroke:var(--ok);stroke-width:4}
+.deg{font:600 40px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.hint{color:var(--muted);font-size:15px;min-height:1.45em}
+.aligned-msg{color:var(--ok);font-weight:600}
+.btn{border:0;border-radius:12px;background:var(--accent);color:var(--surface);padding:12px 20px;font-weight:500;font-size:16px}
+.small{font-size:13px;color:var(--muted);max-width:32ch}
+
+/* Tabs */
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 6px) max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:center;gap:8px}
+.tab{flex:1;max-width:200px;border:0;background:none;padding:8px;border-radius:10px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:13px}
+.tab svg{width:24px;height:24px}
+.tab[aria-selected=true]{color:var(--accent)}
+.note{margin-top:14px;font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){#rose{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="place"><b id="placeName">…</b><span id="dateLine"></span></div>
+    <button class="chip" id="langBtn" type="button">العربية</button>
+  </header>
+
+  <section id="viewTimes">
+    <div class="next">
+      <div class="label" data-t="next"></div>
+      <h1 id="nextName">—</h1>
+      <div class="when"><span id="nextTime"></span> · <strong id="countdown"></strong></div>
+    </div>
+    <div class="sky" aria-hidden="true">
+      <div class="band" id="band"></div>
+      <div id="marks"></div>
+      <div class="now" id="nowMark"></div>
+    </div>
+    <div class="hours" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+    <ul class="list" id="list"></ul>
+    <div class="meta"><span data-t="method"></span><button class="chip" id="locBtn" type="button" data-t="update"></button></div>
+    <p class="note" id="locNote" hidden></p>
+  </section>
+
+  <section id="viewQibla" hidden>
+    <div class="qibla" id="qiblaBox">
+      <div class="dialwrap">
+        <svg viewBox="0 0 320 320" role="img" id="dial">
+          <path class="pointer" d="M160 0 L170 18 L150 18 Z"/>
+          <g id="rose">
+            <circle class="ring" cx="160" cy="160" r="138"/>
+            <g id="ticks"></g>
+            <text class="card n" x="160" y="44" data-t="cN"></text>
+            <text class="card" x="276" y="160" data-t="cE"></text>
+            <text class="card" x="160" y="276" data-t="cS"></text>
+            <text class="card" x="44" y="160" data-t="cW"></text>
+            <g id="qArm">
+              <line class="qline" x1="160" y1="160" x2="160" y2="52"/>
+              <rect class="kaaba" x="146" y="22" width="28" height="28" rx="2"/>
+              <rect class="kaaba-band" x="146" y="29" width="28" height="4"/>
+            </g>
+            <circle cx="160" cy="160" r="5" fill="var(--accent)"/>
+          </g>
+        </svg>
+      </div>
+      <div class="deg" id="qDeg">—</div>
+      <div class="hint" id="qHint"></div>
+      <button class="btn" id="compassBtn" type="button" data-t="startCompass"></button>
+      <div class="small" id="qDist"></div>
+      <div class="small" data-t="flat"></div>
+    </div>
+  </section>
+</div>
+
+<nav role="tablist">
+  <button class="tab" role="tab" aria-selected="true" id="tabTimes" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span data-t="times"></span></button>
+  <button class="tab" role="tab" aria-selected="false" id="tabQibla" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 5l3 8h-6z" fill="currentColor"/></svg>
+    <span data-t="qibla"></span></button>
+</nav>
+
+<script>
+// Prayer time + Qibla math (Umm al-Qura method). Shared by the web app and the widget.
+const PT = (() => {
+  const d2r = d => d * Math.PI / 180, r2d = r => r * 180 / Math.PI;
+  const sin = d => Math.sin(d2r(d)), cos = d => Math.cos(d2r(d)), tan = d => Math.tan(d2r(d));
+  const asin = x => r2d(Math.asin(x)), acos = x => r2d(Math.acos(x)), atan2 = (y, x) => r2d(Math.atan2(y, x));
+  const acot = x => r2d(Math.atan(1 / x));
+  const fix = (a, b) => { a = a - b * Math.floor(a / b); return a < 0 ? a + b : a; };
+
+  function julian(y, m, d) {
+    if (m <= 2) { y -= 1; m += 12; }
+    const A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  }
+  function sunPos(jd) {
+    const D = jd - 2451545.0;
+    const g = fix(357.529 + 0.98560028 * D, 360);
+    const q = fix(280.459 + 0.98564736 * D, 360);
+    const L = fix(q + 1.915 * sin(g) + 0.020 * sin(2 * g), 360);
+    const e = 23.439 - 0.00000036 * D;
+    const RA = fix(atan2(cos(e) * sin(L), cos(L)) / 15, 24);
+    return { decl: asin(sin(e) * sin(L)), eqt: q / 15 - RA };
+  }
+
+  // Returns Date objects for one calendar day at (lat, lng).
+  // `date` is a JS Date; its local Y/M/D and the device's time zone are used.
+  function times(date, lat, lng, isRamadan) {
+    const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+    const jd = julian(y, m, d) - lng / (15 * 24);
+    const midDay = t => fix(12 - sunPos(jd + t).eqt, 24);
+    const angleTime = (angle, t, ccw) => {
+      const decl = sunPos(jd + t).decl, noon = midDay(t);
+      const x = (-sin(angle) - sin(decl) * sin(lat)) / (cos(decl) * cos(lat));
+      const T = acos(Math.max(-1, Math.min(1, x))) / 15;
+      return noon + (ccw ? -T : T);
+    };
+    const asrTime = (factor, t) => {
+      const decl = sunPos(jd + t).decl;
+      return angleTime(-acot(factor + tan(Math.abs(lat - decl))), t);
+    };
+    // two passes for precision
+    let h = { fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, maghrib: 18 };
+    for (let i = 0; i < 2; i++) {
+      const t = k => h[k] / 24;
+      h = {
+        fajr: angleTime(18.5, t('fajr'), true),
+        sunrise: angleTime(0.833, t('sunrise'), true),
+        dhuhr: midDay(t('dhuhr')),
+        asr: asrTime(1, t('asr')),
+        maghrib: angleTime(0.833, t('maghrib')),
+      };
+    }
+    // hours are in UTC-based solar hours relative to longitude; convert to Date
+    const base = Date.UTC(y, m - 1, d);
+    const toDate = hrs => {
+      const ms = base + (hrs - lng / 15) * 3600e3;
+      return new Date(Math.ceil(ms / 60000) * 60000); // round up to the minute, like the official tables
+    };
+    const out = {};
+    for (const k in h) out[k] = toDate(h[k]);
+    out.isha = new Date(out.maghrib.getTime() + (isRamadan ? 120 : 90) * 60000);
+    return out;
+  }
+
+  const KAABA = { lat: 21.4225, lng: 39.8262 };
+  function qibla(lat, lng) {
+    const dl = KAABA.lng - lng;
+    return fix(atan2(sin(dl), cos(lat) * tan(KAABA.lat) - sin(lat) * cos(dl)), 360);
+  }
+  function distanceKm(lat, lng) {
+    const R = 6371, dLat = d2r(KAABA.lat - lat), dLng = d2r(KAABA.lng - lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(d2r(lat)) * Math.cos(d2r(KAABA.lat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function isRamadan(date) {
+    try {
+      const p = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { month: 'numeric' }).formatToParts(date);
+      return Number(p.find(x => x.type === 'month').value) === 9;
+    } catch (e) { return false; }
+  }
+  return { times, qibla, distanceKm, isRamadan };
+})();
+
+
+const STR = {
+  en:{ next:"Next prayer", in:"in", times:"Times", qibla:"Qibla", method:"Umm al-Qura method",
+    update:"Update location", startCompass:"Start compass", flat:"Hold your phone flat, away from metal and cars.",
+    fromNorth:"from north", toMakkah:"to Makkah", facing:"You are facing the Qibla", right:"Turn right", left:"Turn left",
+    noCompass:"No compass here. Face the angle shown, measured clockwise from north.",
+    denied:"Location is off. Showing the last saved place.", fallback:"Location is off. Showing Dhahran.",
+    near:"Near", km:"km", h:"h", m:"m", tomorrow:"tomorrow", lang:"العربية", cN:"N",cE:"E",cS:"S",cW:"W",
+    names:{fajr:"Fajr",sunrise:"Sunrise",dhuhr:"Dhuhr",asr:"Asr",maghrib:"Maghrib",isha:"Isha"}, friday:"Jumu'ah" },
+  ar:{ next:"الصلاة القادمة", in:"بعد", times:"المواقيت", qibla:"القبلة", method:"تقويم أم القرى",
+    update:"تحديث الموقع", startCompass:"تشغيل البوصلة", flat:"أمسك الجوال بشكل مستوٍ وبعيدًا عن المعادن والسيارات.",
+    fromNorth:"من الشمال", toMakkah:"إلى مكة المكرمة", facing:"أنت باتجاه القبلة", right:"استدر يمينًا", left:"استدر يسارًا",
+    noCompass:"لا توجد بوصلة هنا. اتجه بالزاوية الظاهرة مقاسة من الشمال باتجاه عقارب الساعة.",
+    denied:"الموقع غير مفعّل. يتم عرض آخر موقع محفوظ.", fallback:"الموقع غير مفعّل. يتم عرض الظهران.",
+    near:"قرب", km:"كم", h:"س", m:"د", tomorrow:"غدًا", lang:"English", cN:"ش",cE:"ق",cS:"ج",cW:"غ",
+    names:{fajr:"الفجر",sunrise:"الشروق",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"}, friday:"الجمعة" }
+};
+const CITIES = [
+  ["Dhahran","الظهران",26.2886,50.1140],["Al Khobar","الخبر",26.2172,50.1971],["Dammam","الدمام",26.4207,50.0888],
+  ["Qatif","القطيف",26.5196,50.0115],["Jubail","الجبيل",27.0046,49.6460],["Ras Tanura","رأس تنورة",26.6438,50.1590],
+  ["Abqaiq","بقيق",25.9350,49.6680],["Al Ahsa","الأحساء",25.3830,49.5860],["Hafar Al Batin","حفر الباطن",28.4328,45.9708],
+  ["Riyadh","الرياض",24.7136,46.6753],["Buraydah","بريدة",26.3592,43.9818],["Hail","حائل",27.5114,41.7208],
+  ["Makkah","مكة المكرمة",21.4225,39.8262],["Jeddah","جدة",21.4858,39.1925],["Taif","الطائف",21.2703,40.4158],
+  ["Madinah","المدينة المنورة",24.4672,39.6024],["Yanbu","ينبع",24.0890,38.0637],["Tabuk","تبوك",28.3835,36.5662],
+  ["Abha","أبها",18.2164,42.5053],["Jazan","جازان",16.8892,42.5511],["Najran","نجران",17.4924,44.1277],
+  ["NEOM","نيوم",27.9500,35.3000],["Al Jawf","الجوف",29.9697,40.2064],["Arar","عرعر",30.9753,41.0381],
+  ["Manama","المنامة",26.2285,50.5860],["Kuwait City","مدينة الكويت",29.3759,47.9774],["Doha","الدوحة",25.2854,51.5310],
+  ["Abu Dhabi","أبوظبي",24.4539,54.3773],["Dubai","دبي",25.2048,55.2708],["Muscat","مسقط",23.5880,58.3829],
+  ["Cairo","القاهرة",30.0444,31.2357],["Amman","عمّان",31.9454,35.9284],["Istanbul","إسطنبول",41.0082,28.9784],
+  ["London","لندن",51.5072,-0.1276],["Houston","هيوستن",29.7604,-95.3698],["Chicago","شيكاغو",41.8781,-87.6298],
+  ["Des Plaines","ديس بلاينز",42.0334,-87.8834],["Champaign","شامبين",40.1164,-88.2434],["Singapore","سنغافورة",1.3521,103.8198]
+];
+const ORDER = ["fajr","sunrise","dhuhr","asr","maghrib","isha"];
+const store = { get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}} };
+
+let lang = store.get("lang") || ((navigator.language||"").startsWith("ar") ? "ar" : "en");
+let loc = store.get("loc") || { lat:26.2886, lng:50.1140, fallback:true };
+let heading = null, view = "times";
+const $ = id => document.getElementById(id);
+const T = () => STR[lang];
+const locale = () => lang === "ar" ? "ar-SA-u-ca-gregory-nu-arab" : "en-GB";
+const fmtTime = d => d.toLocaleTimeString(lang==="ar"?"ar-SA-u-nu-arab":"en-US",{hour:"numeric",minute:"2-digit"});
+const num = n => n.toLocaleString(lang==="ar"?"ar-SA-u-nu-arab":"en-US");
+
+function nearestCity(){
+  let best=null, bd=1e9;
+  for (const c of CITIES){ const d=Math.hypot(c[2]-loc.lat,(c[3]-loc.lng)*Math.cos(loc.lat*Math.PI/180)); if(d<bd){bd=d;best=c;} }
+  return bd < 0.6 ? best : null; // ~65 km
+}
+function dayTimes(date){ return PT.times(date, loc.lat, loc.lng, PT.isRamadan(date)); }
+
+function applyLang(){
+  document.documentElement.lang = lang; document.documentElement.dir = lang==="ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = T()[el.dataset.t]);
+  $("langBtn").textContent = T().lang;
+  render(); renderQibla();
+}
+
+function render(){
+  const now = new Date();
+  const today = dayTimes(now);
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate()+1);
+  const tmr = dayTimes(tomorrow);
+  const isFri = now.getDay() === 5;
+
+  // header
+  const c = nearestCity();
+  $("placeName").textContent = c ? (lang==="ar" ? c[1] : c[0]) + (loc.fallback ? "" : "")
+    : `${loc.lat.toFixed(3)}°, ${loc.lng.toFixed(3)}°`;
+  let hijri = "";
+  try { hijri = new Intl.DateTimeFormat(lang==="ar"?"ar-SA-u-ca-islamic-umalqura-nu-arab":"en-u-ca-islamic-umalqura",{day:"numeric",month:"long",year:"numeric"}).format(now); } catch(e){}
+  const greg = now.toLocaleDateString(locale(),{weekday:"long",day:"numeric",month:"long"});
+  $("dateLine").textContent = greg + (hijri ? " · " + hijri : "");
+
+  // next prayer (sunrise is shown but never counted as "next prayer")
+  let nextKey = ORDER.find(k => k!=="sunrise" && today[k] > now), nextAt, isTmr = false;
+  if (!nextKey){ nextKey="fajr"; nextAt=tmr.fajr; isTmr=true; } else nextAt = today[nextKey];
+  const nm = k => (k==="dhuhr" && isFri) ? T().friday : T().names[k];
+  $("nextName").textContent = nm(nextKey);
+  $("nextTime").textContent = fmtTime(nextAt) + (isTmr ? " " + T().tomorrow : "");
+  const mins = Math.max(0, Math.ceil((nextAt - now)/60000));
+  const hh = Math.floor(mins/60), mm = mins%60;
+  $("countdown").textContent = `${T().in} ${hh ? num(hh)+" "+T().h+" " : ""}${num(mm)} ${T().m}`;
+
+  // list
+  $("list").innerHTML = "";
+  for (const k of ORDER){
+    const li = document.createElement("li");
+    if (k==="sunrise") li.classList.add("sun");
+    if (!isTmr && k===nextKey) li.classList.add("is-next");
+    else if (today[k] <= now && k!=="sunrise") li.classList.add("past");
+    const a = document.createElement("span"); a.className="n"; a.textContent = nm(k);
+    const b = document.createElement("span"); b.className="t"; b.textContent = fmtTime(today[k]);
+    li.append(a,b); $("list").append(li);
+  }
+  if (isTmr) $("list").firstChild.classList.add("is-next");
+
+  // sky band
+  const mid = new Date(now); mid.setHours(0,0,0,0);
+  const pct = d => Math.max(0,Math.min(100,(d-mid)/864e5*100));
+  const night="#1E2A44", dusk="#4B4F86", dawn="#E3A27C", day="#BFDDE6";
+  const g = [
+    `${night} 0%`, `${night} ${pct(today.fajr)}%`, `${dusk} ${(pct(today.fajr)+pct(today.sunrise))/2}%`,
+    `${dawn} ${pct(today.sunrise)}%`, `${day} ${pct(today.sunrise)+4}%`, `${day} ${pct(today.maghrib)-4}%`,
+    `${dawn} ${pct(today.maghrib)}%`, `${dusk} ${(pct(today.maghrib)+pct(today.isha))/2}%`, `${night} ${pct(today.isha)}%`, `${night} 100%`
+  ].join(",");
+  $("band").style.setProperty("--g", g);
+  const side = lang==="ar" ? "right" : "left";
+  $("marks").innerHTML = "";
+  for (const k of ORDER){ const m=document.createElement("div"); m.className="mark"+(k==="sunrise"?" sun":""); m.style[side]=pct(today[k])+"%"; $("marks").append(m); }
+  $("nowMark").style.left = $("nowMark").style.right = "";
+  $("nowMark").style[side] = pct(now)+"%";
+  if (lang==="ar") $("band").style.transform="scaleX(-1)"; else $("band").style.transform="";
+}
+
+// ---------- Qibla ----------
+(function buildTicks(){
+  const g = $("ticks"); let s="";
+  for (let a=0;a<360;a+=15){ const major=a%90===0; const r1=138, r2=major?122:130;
+    const x=v=>160+v*Math.sin(a*Math.PI/180), y=v=>160-v*Math.cos(a*Math.PI/180);
+    s += `<line class="tick${major?" major":""}" x1="${x(r1)}" y1="${y(r1)}" x2="${x(r2)}" y2="${y(r2)}"/>`; }
+  g.innerHTML = s;
+})();
+function renderQibla(){
+  const q = PT.qibla(loc.lat, loc.lng);
+  $("qArm").setAttribute("transform", `rotate(${q} 160 160)`);
+  $("qDeg").textContent = num(Math.round(q)) + "°";
+  $("qDist").textContent = `${num(Math.round(PT.distanceKm(loc.lat,loc.lng)))} ${T().km} ${T().toMakkah}`;
+  const box = $("qiblaBox");
+  if (heading === null){
+    $("rose").style.transform = "";
+    box.classList.remove("aligned");
+    $("qHint").textContent = T().fromNorth;
+    return;
+  }
+  $("rose").style.transform = `rotate(${-heading}deg)`;
+  let diff = ((q - heading + 540) % 360) - 180;
+  if (Math.abs(diff) <= 4){ box.classList.add("aligned"); $("qHint").innerHTML = `<span class="aligned-msg">${T().facing}</span>`; }
+  else { box.classList.remove("aligned"); $("qHint").textContent = `${diff>0?T().right:T().left} ${num(Math.round(Math.abs(diff)))}°`; }
+}
+let smooth = null;
+function onOrient(e){
+  let h = null;
+  if (typeof e.webkitCompassHeading === "number") h = e.webkitCompassHeading;
+  else if (e.absolute && typeof e.alpha === "number") h = 360 - e.alpha;
+  if (h === null) return;
+  // smooth jitter, handling the 359→0 wrap
+  if (smooth === null) smooth = h;
+  else { const d = ((h - smooth + 540) % 360) - 180; smooth = (smooth + d*0.25 + 360) % 360; }
+  heading = smooth; $("compassBtn").hidden = true;
+  if (view==="qibla") renderQibla();
+}
+async function startCompass(){
+  try {
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function"){
+      const r = await DeviceOrientationEvent.requestPermission(); if (r !== "granted") throw 0;
+    }
+    window.addEventListener("deviceorientationabsolute", onOrient);
+    window.addEventListener("deviceorientation", onOrient);
+    setTimeout(()=>{ if (heading===null) $("qHint").textContent = T().noCompass; }, 2500);
+  } catch(e){ $("qHint").textContent = T().noCompass; }
+}
+
+// ---------- Location ----------
+function getLocation(){
+  if (!navigator.geolocation){ showLocNote(); return; }
+  navigator.geolocation.getCurrentPosition(p => {
+    loc = { lat:p.coords.latitude, lng:p.coords.longitude };
+    store.set("loc", loc); $("locNote").hidden = true; render(); renderQibla();
+  }, showLocNote, { enableHighAccuracy:false, timeout:15000, maximumAge:600000 });
+}
+function showLocNote(){ $("locNote").hidden = false; $("locNote").textContent = loc.fallback ? T().fallback : T().denied; }
+
+// ---------- Tabs ----------
+function setView(v){
+  view = v; $("viewTimes").hidden = v!=="times"; $("viewQibla").hidden = v!=="qibla";
+  $("tabTimes").setAttribute("aria-selected", v==="times"); $("tabQibla").setAttribute("aria-selected", v==="qibla");
+  if (v==="qibla") renderQibla();
+}
+$("tabTimes").onclick = () => setView("times");
+$("tabQibla").onclick = () => setView("qibla");
+$("compassBtn").onclick = startCompass;
+$("locBtn").onclick = getLocation;
+$("langBtn").onclick = () => { lang = lang==="ar" ? "en" : "ar"; store.set("lang", lang); applyLang(); };
+if (location.hash === "#qibla") setView("qibla");
+
+applyLang();
+getLocation();
+setInterval(render, 20000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden){ render(); getLocation(); } });
+</script>
+</body>
+</html>

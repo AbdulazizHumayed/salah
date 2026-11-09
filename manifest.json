@@ -1,0 +1,15 @@
+{
+ "name": "Salah & Qibla",
+ "short_name": "Salah",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#EDF0EE",
+ "theme_color": "#EDF0EE",
+ "icons": [
+  {
+   "src": "icon.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}
